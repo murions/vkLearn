@@ -26,7 +26,7 @@ set(GLFW_BUILD_DIRECTORY ${CMAKE_BINARY_DIR}/ext/glfw-3.3.9/build)
 set(GLM_INCLUDE_DIRECTORY ${CMAKE_BINARY_DIR}/ext/glm)
 set(VULKAN_INCLUDE_DIRECTORY ${CMAKE_BINARY_DIR}/ext/vulkan)
 
-# set path micro
+# set path macro
 add_compile_definitions(HOME_DIR="${CMAKE_SOURCE_DIR}")
 
 # glfw build
