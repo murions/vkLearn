@@ -243,8 +243,8 @@ int main(){
     }
 
     // load shader
-    std::ifstream vsFile("../../../src/vk_shader/vert.spv", std::ios::ate | std::ios::binary);
-    std::ifstream fsFile("../../../src/vk_shader/frag.spv", std::ios::ate | std::ios::binary);
+    std::ifstream vsFile(HOME_DIR"/src/vk_shader/vert.spv", std::ios::ate | std::ios::binary);
+    std::ifstream fsFile(HOME_DIR"/src/vk_shader/frag.spv", std::ios::ate | std::ios::binary);
     if(!vsFile.is_open()){
         throw std::runtime_error("Failed to open vertex shader");
     }
