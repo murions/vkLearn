@@ -1,7 +1,5 @@
-#include "vulkan/vulkan_core.h"
-#define GLFW_INCLUDE_VULKAM
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-
 #include <iostream>
 
 const int width = 800;
@@ -20,13 +18,14 @@ private:
     VkInstance instance;
 
     void initWindow(){
+        glfwInit();
         glfwInitHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwInitHint(GLFW_RESIZABLE, GLFW_FALSE);
 
         window = glfwCreateWindow(width, height, "window", nullptr, nullptr);
         if(window == nullptr){
             glfwTerminate();
-            exit(1);
+            throw std::runtime_error("Failed to create window!");
         }
     }
 
@@ -68,7 +67,7 @@ private:
         // create instance
         VkResult result = vkCreateInstance(&instanceCrtInfo, nullptr, &instance);
         if(result != VK_SUCCESS){
-            exit(1);
+            throw std::runtime_error("Failed to create instance!");
         }
     }
 };

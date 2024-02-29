@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(vk_device)
+project(vk_logicalDevice)
 
 # add executable
 add_executable(${PROJECT_NAME} main.cpp)

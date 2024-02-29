@@ -1,10 +1,8 @@
-#include "vulkan/vulkan_core.h"
-#include <cstdint>
-#include <stdexcept>
-#include <vector>
 #define GLFW_INCLUDE_VULKAN
-#include<GLFW/glfw3.h>
-#include<iostream>
+#include <GLFW/glfw3.h>
+#include <iostream>
+#include <vector>
+
 
 const int width = 800;
 const int height = 600;

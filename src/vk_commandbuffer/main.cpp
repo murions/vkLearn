@@ -1,10 +1,9 @@
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
 #include <fstream>
 #include <iostream>
 #include <vector>
 #include <set>
-#define GLFW_INCLUDE_VULKAN
-
-#include <GLFW/glfw3.h>
 
 struct queueFamilyIndices{
     int graphicsFamily = -1;
@@ -477,6 +476,7 @@ int main(){
     VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
     commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     commandBufferAllocateInfo.commandPool = commandPool;
+    commandBufferAllocateInfo.commandBufferCount = 1;
     commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     success = vkAllocateCommandBuffers(logicalDevice, &commandBufferAllocateInfo, &commandBuffer);
     if(success != VK_SUCCESS){

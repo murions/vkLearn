@@ -1,14 +1,9 @@
-#include "vulkan/vulkan_core.h"
-#include <cstddef>
-#include <cstdint>
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
 #include <fstream>
 #include <iostream>
-#include <stdexcept>
 #include <vector>
 #include <set>
-#define GLFW_INCLUDE_VULKAN
-
-#include <GLFW/glfw3.h>
 
 struct queueFamilyIndices{
     int graphicsFamily = -1;
