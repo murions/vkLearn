@@ -1,22 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
 
-# add include directory
-include_directories(${GLFW_BUILD_DIRECTORY}/../include)
-include_directories(${GLM_INCLUDE_DIRECTORY})
-include_directories(${VULKAN_INCLUDE_DIRECTORY})
-
-# link library directory
-if(WIN32)
-	if(MSVC)
-		link_directories(${GLFW_BUILD_DIRECTORY}/src/Debug)
-		link_directories(${GLFW_BUILD_DIRECTORY}/src/Release)
-	elseif(MINGW)
-		link_directories(${GLFW_BUILD_DIRECTORY}/src)
-	endif()
-elseif(LINUX)
-	link_directories(${GLFW_BUILD_DIRECTORY}/src)
-endif()
-
 add_subdirectory(vk_window)
 add_subdirectory(vk_instance)
 add_subdirectory(vk_physicalDevice)
