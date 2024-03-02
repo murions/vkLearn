@@ -1,7 +1,4 @@
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-#include <fstream>
-#include <iostream>
+#include "common/vkShader.h"
 #include <vector>
 #include <set>
 
@@ -45,6 +42,10 @@ int main(){
         throw std::runtime_error("Failed to create window");
         return -1;
     }
+
+    // spirvHelper
+    SpirvHelper spirvHelper;
+    spirvHelper.Init();
 
     // app info
     VkApplicationInfo appInfo = {};
@@ -286,34 +287,34 @@ int main(){
     }
 
     // load shader
-    std::ifstream vsFile(HOME_DIR"/src/vk_shader/vert.spv", std::ios::ate | std::ios::binary);
-    std::ifstream fsFile(HOME_DIR"/src/vk_shader/frag.spv", std::ios::ate | std::ios::binary);
-    if(!vsFile.is_open()){
-        throw std::runtime_error("Failed to open vertex shader");
+    std::string vsShader = "";
+    std::string fsShader = "";
+    if(!spirvHelper.GLSLFileLoader(HOME_DIR"/src/vk_shader/vert.vert", vsShader)){
+        throw std::runtime_error("Failed to read vertex shader");
     }
-    if(!fsFile.is_open()){
-        throw std::runtime_error("Failed to open fragment shader");
+    if(!spirvHelper.GLSLFileLoader(HOME_DIR"/src/vk_shader/frag.frag", fsShader)){
+        throw std::runtime_error("Failed to read fragment shader");
     }
-    size_t vsSize = (size_t)vsFile.tellg();
-    std::vector<char> vsSource(vsSize);
-    vsFile.seekg(0);
-    vsFile.read(vsSource.data(), vsSize);
-    vsFile.close();
-    size_t fsSize = (size_t)fsFile.tellg();
-    std::vector<char> fsSource(fsSize);
-    fsFile.seekg(0);
-    fsFile.read(fsSource.data(), fsSize);
-    fsFile.close();
+
+    // spirv convert
+    std::vector<uint32_t> vsSPIV;
+    std::vector<uint32_t> fsSPIV;
+    if(!spirvHelper.GLSLtoSPV(VK_SHADER_STAGE_VERTEX_BIT, vsShader.c_str(), vsSPIV)){
+        throw std::runtime_error("Failed to convert vertex glsl code to SPIRV");
+    }
+    if(!spirvHelper.GLSLtoSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fsShader.c_str(), fsSPIV)){
+        throw std::runtime_error("Failed to convert fragment code to SPIRV");
+    }
 
     // shader module info
     VkShaderModuleCreateInfo vsShaderModuleInfo = {};
     VkShaderModuleCreateInfo fsShaderModuleInfo = {};
     vsShaderModuleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    vsShaderModuleInfo.codeSize = vsSource.size();
-    vsShaderModuleInfo.pCode = reinterpret_cast<const uint32_t*>(vsSource.data());
+    vsShaderModuleInfo.codeSize = vsSPIV.size() * sizeof(uint32_t);
+    vsShaderModuleInfo.pCode = vsSPIV.data();
     fsShaderModuleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    fsShaderModuleInfo.codeSize = fsSource.size();
-    fsShaderModuleInfo.pCode = reinterpret_cast<const uint32_t*>(fsSource.data());
+    fsShaderModuleInfo.codeSize = fsSPIV.size() * sizeof(uint32_t);
+    fsShaderModuleInfo.pCode = fsSPIV.data();
 
     // shader module
     VkShaderModule vsShaderModule;
@@ -326,10 +327,6 @@ int main(){
     if(success != VK_SUCCESS){
         throw std::runtime_error("Failed to create fragment shader module");
     }
-    vsSource.clear();
-    vsSource.shrink_to_fit();
-    fsSource.clear();
-    fsSource.shrink_to_fit();
 
     // pipeline shader stage info
     VkPipelineShaderStageCreateInfo vsPipelineShaderStageInfo = {};
@@ -607,6 +604,7 @@ int main(){
     vkDeviceWaitIdle(logicalDevice);
 
     // clear
+    spirvHelper.Finalize();
     vkDestroyShaderModule(logicalDevice, vsShaderModule, nullptr);
     vkDestroyShaderModule(logicalDevice, fsShaderModule, nullptr);
     vkDestroySemaphore(logicalDevice, imageAvailableSemaphore, nullptr);

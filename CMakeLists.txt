@@ -11,7 +11,8 @@ endif()
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/ext)
 
 #set global path
-set(VKLEARN_BINARY_DIRECTORY ${CMAKE_BINARY_DIR})
+set(VKLEARN_TOP_LEVEL_DIR ${CMAKE_SOURCE_DIR})
+set(VKLEARN_BINARY_DIR ${CMAKE_BINARY_DIR})
 
 # download third-party library
 add_subdirectory(ext)
@@ -21,7 +22,10 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E tar xf ${CMAKE_SOURCE_DIR}/ext/vulka
 )
 
 # set third-party path
-set(VULKAN_INCLUDE_DIRECTORY ${CMAKE_BINARY_DIR}/ext/vulkan)
+set(VULKAN_INCLUDE_DIR ${CMAKE_BINARY_DIR}/ext/vulkan)
+
+# find vulkan
+find_package(Vulkan REQUIRED)
 
 # set path macro
 add_compile_definitions(HOME_DIR="${CMAKE_SOURCE_DIR}")
