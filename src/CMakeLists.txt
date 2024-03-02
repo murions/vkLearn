@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.18)
 
 # add single subdirectory
 function(buildSubProject SUBPROJECT_NAME)
@@ -9,6 +9,7 @@ function(buildSubProject SUBPROJECT_NAME)
     target_sources(${SUBPROJECT_NAME}
         PUBLIC
             ${CMAKE_CURRENT_LIST_DIR}/common/vkShader.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/common/util.cpp
     )
     
     # add include directory
