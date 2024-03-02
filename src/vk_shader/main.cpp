@@ -4,7 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <set>
-#include "vkShader.h"
+#include "common/vkShader.h"
 
 struct queueFamilyIndices{
     int graphicsFamily = -1;
@@ -46,9 +46,6 @@ int main(){
         throw std::runtime_error("Failed to create window");
         return -1;
     }
-
-    SpirvHelper spirvHelper;
-    spirvHelper.Init();
 
     // app info
     VkApplicationInfo appInfo = {};
@@ -305,7 +302,6 @@ int main(){
     }
 
     // clear
-    spirvHelper.Finalize();
     vkDestroyShaderModule(logicalDevice, vsShaderModule, nullptr);
     vkDestroyShaderModule(logicalDevice, fsShaderModule, nullptr);
     for(auto &imageview : swapchainImageViews)
