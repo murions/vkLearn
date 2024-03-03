@@ -19,4 +19,5 @@ You can build the project both on Windows and Linux.
 - [vk_framebuffer](src/vk_framebuffer)
 - [vk_commandBuffer](src/vk_commandBuffer)
 - [vk_draw](src/vk_draw)
+- [vk_inflight](src/vk_inflight)
 
