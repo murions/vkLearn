@@ -1,15 +1,18 @@
 #include "vkShader.h"
+#include "util.h"
 #include "SPIRV/GlslangToSpv.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>
 
 void SpirvHelper::Init() {
+    std::cout << "Init glslang." << std::endl;
     glslang::InitializeProcess();
 }
 
 void SpirvHelper::Finalize() {
     glslang::FinalizeProcess();
+    std::cout << "Finalize glslang." << std::endl;
 }
 
 bool SpirvHelper::GLSLFileLoader(std::string path, std::string& shaderSource){
@@ -63,6 +66,20 @@ bool SpirvHelper::GLSLtoSPV(const VkShaderStageFlagBits shader_type, const char 
     }
 
     glslang::GlslangToSpv(*program.getIntermediate(stage), spirv);
+    return true;
+}
+
+bool SpirvHelper::createVFShader(std::string vsPath, std::string fsPath, std::vector<uint32_t>& vsSPIRV, std::vector<uint32_t>& fsSPIRV){
+    // load shader
+    std::string vsShader = "";
+    std::string fsShader = "";
+    VK_EXPECT_TRUE(GLSLFileLoader(vsPath, vsShader), "Failed to read vertex shader.");
+    VK_EXPECT_TRUE(GLSLFileLoader(fsPath, fsShader), "Failed to read fragment shader.");
+
+    // spirv convert
+    VK_EXPECT_TRUE(GLSLtoSPV(VK_SHADER_STAGE_VERTEX_BIT, vsShader.c_str(), vsSPIRV), "Failed to convert vertex glsl code to SPIRV.");
+    VK_EXPECT_TRUE(GLSLtoSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fsShader.c_str(), fsSPIRV), "Failed to convert fragment code to SPIRV.");
+
     return true;
 }
 
@@ -188,3 +205,5 @@ EShLanguage SpirvHelper::FindLanguage(const VkShaderStageFlagBits shader_type) {
         return EShLangVertex;
     }
 }
+
+size_t VKShader::objectCnt = 0;
