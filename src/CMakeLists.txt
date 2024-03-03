@@ -66,6 +66,7 @@ set(SUBPROJECTS
     vk_framebuffer
     vk_commandBuffer
     vk_draw
+    vk_inflight
 )
 
 buildSubProjects()
