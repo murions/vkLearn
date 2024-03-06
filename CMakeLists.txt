@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.16)
 project(vkLearn)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD 17)
 if(UNIX AND NOT APPLE)
     set(LINUX TRUE)
 endif()
+
+# option
+option(ENABLE_VALIDATION_LAYER "Choose to enable VK_VALIDATION_LAYER or not." ON)
 
 # mkdir
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/ext)
@@ -29,5 +32,8 @@ find_package(Vulkan REQUIRED)
 
 # set path macro
 add_compile_definitions(HOME_DIR="${CMAKE_SOURCE_DIR}")
+if(ENABLE_VALIDATION_LAYER)
+    add_compile_definitions(VK_ENABLE_VALIDATION_LAYER=ON)
+endif()
 
 add_subdirectory(src)

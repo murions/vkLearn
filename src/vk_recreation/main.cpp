@@ -240,7 +240,11 @@ private:
         // fill instance info
         uint32_t extensionCnt = 0;
         static const char** extensions = glfwGetRequiredInstanceExtensions(&extensionCnt);
-        static std::vector<const char*> layer = {"VK_LAYER_KHRONOS_validation"};
+        static std::vector<const char*> layer = {
+        #ifdef VK_ENABLE_VALIDATION_LAYER
+            "VK_LAYER_KHRONOS_validation"
+        #endif
+            };
         instanceInfo.pApplicationInfo = &appInfo;
         instanceInfo.enabledExtensionCount = extensionCnt;
         instanceInfo.ppEnabledExtensionNames = extensions;

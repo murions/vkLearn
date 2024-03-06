@@ -66,7 +66,9 @@ int main(){
     instanceCreateInfo.enabledExtensionCount = extensionCnt;
     instanceCreateInfo.ppEnabledExtensionNames = exts.data();
     std::vector<const char*> layer = {
-        "VK_LAYER_KHRONOS_validation"
+        #ifdef VK_ENABLE_VALIDATION_LAYER
+            "VK_LAYER_KHRONOS_validation"
+        #endif
     };
     instanceCreateInfo.enabledLayerCount = layer.size();
     instanceCreateInfo.ppEnabledLayerNames = layer.data();

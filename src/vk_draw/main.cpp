@@ -4,7 +4,6 @@
 #include <iostream>
 
 VKShader shader(CURRENT_FILE_DIR"/vert.vert", CURRENT_FILE_DIR"/frag.frag");
-
 VkExtent2D windowSize{800u, 600u};
 VkViewport viewport{0.0, 0.0, (float)windowSize.width, (float)windowSize.height, 0.0, 1.0};
 VkRect2D scissor{{0, 0}, windowSize};
@@ -33,7 +32,11 @@ int main(){
     { // fill instance info
         uint32_t extensionCnt = 0;
         static const char** extensions = glfwGetRequiredInstanceExtensions(&extensionCnt);
-        static std::vector<const char*> layer = {"VK_LAYER_KHRONOS_validation"};
+        static std::vector<const char*> layer = {
+        #ifdef VK_ENABLE_VALIDATION_LAYER
+            "VK_LAYER_KHRONOS_validation"
+        #endif
+        };
         instanceInfo.pApplicationInfo = &appInfo;
         instanceInfo.enabledExtensionCount = extensionCnt;
         instanceInfo.ppEnabledExtensionNames = extensions;
