@@ -1,10 +1,11 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.16)
 
 # include FetchContent
 
 include(FetchContent)
 
-# add third party declares
+# declare third party library
+
 Set(FETCHCONTENT_QUIET FALSE)
 
 FetchContent_Declare(glfw
@@ -23,8 +24,8 @@ FetchContent_Declare(glm
 
 FetchContent_Declare(glslang
     GIT_REPOSITORY https://github.com/KhronosGroup/glslang.git
-    GIT_TAG 14.0.0
-    URL_HASH 0eda6d3b37668cec44336b3328090a5549201d3e7ba9044623012ec54919b203
+    GIT_TAG 12.3.1
+    URL_HASH c1901f2c236f454b2f77a5e73af51dd934b50d08929aac536e1af9d39a2d7307
     GIT_PROGRESS TRUE
 )
 
@@ -42,6 +43,6 @@ set(ENABLE_OPT OFF CACHE BOOL "" FORCE)
 set(ALLOW_EXTERNAL_SPIRV_TOOLS OFF CACHE BOOL "" FORCE)
 set(ENABLE_GLSLANG_BINARIES OFF CACHE BOOL "" FORCE)
 
-# build glfw, glm, glslang
+# download and build glfw, glm, glslang
 
 FetchContent_MakeAvailable(glfw glm glslang)
