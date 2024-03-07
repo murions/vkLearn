@@ -233,7 +233,7 @@ private:
     void createInstance(){
         // fill app info
         appInfo.pEngineName = "No Engine";
-        appInfo.pApplicationName = "VKInflight";
+        appInfo.pApplicationName = "VKRecreation";
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.apiVersion = VK_API_VERSION_1_0;
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);

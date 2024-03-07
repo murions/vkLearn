@@ -51,7 +51,7 @@ int main(){
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pNext = nullptr;
     appInfo.pEngineName = "No Engine";
-    appInfo.pApplicationName = "VKCommand";
+    appInfo.pApplicationName = "VKRenderPass";
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_0;
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -333,8 +333,7 @@ int main(){
     fsPipelineShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
     fsPipelineShaderStageInfo.module = fsShaderModule;
     fsPipelineShaderStageInfo.pName = "main";
-    std::vector<VkPipelineShaderStageCreateInfo> pipelineShaderStageInfo = {vsPipelineShaderStageInfo, fsPipelineShaderStageInfo};
-    
+
     // pipeline vertex input stage info
     VkPipelineVertexInputStateCreateInfo pipelineVertexInputStageInfo = {};
     pipelineVertexInputStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -387,20 +386,12 @@ int main(){
     VkPipelineColorBlendAttachmentState pipelineColorBlendAttachmentState = {};
     pipelineColorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     pipelineColorBlendAttachmentState.blendEnable = VK_FALSE;
-
-    // pipeline color blend state info
-    VkPipelineColorBlendStateCreateInfo pipelineColorBlendStateInfo = {};
-    pipelineColorBlendStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    pipelineColorBlendStateInfo.attachmentCount = 1;
-    pipelineColorBlendStateInfo.pAttachments = &pipelineColorBlendAttachmentState;
-    pipelineColorBlendStateInfo.logicOpEnable = VK_FALSE;
-
-    // pipeline dynamic state info
-    std::vector<VkDynamicState> dynamicState = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
-    VkPipelineDynamicStateCreateInfo pipelineDynamicStateInfo = {};
-    pipelineDynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    pipelineDynamicStateInfo.dynamicStateCount = dynamicState.size();
-    pipelineDynamicStateInfo.pDynamicStates = dynamicState.data();
+    pipelineColorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+    pipelineColorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+    pipelineColorBlendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    pipelineColorBlendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    pipelineColorBlendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
+    pipelineColorBlendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
 
     // pipeline layout info
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
@@ -417,47 +408,6 @@ int main(){
         throw std::runtime_error("Failed to create pipeline layout");
     }
 
-    // pipeline info
-    VkGraphicsPipelineCreateInfo graphicsPipelineInfo = {};
-    graphicsPipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    graphicsPipelineInfo.renderPass = renderPass;
-    graphicsPipelineInfo.subpass = 0;
-    graphicsPipelineInfo.stageCount = pipelineShaderStageInfo.size();
-    graphicsPipelineInfo.pStages = pipelineShaderStageInfo.data();
-    graphicsPipelineInfo.pVertexInputState = &pipelineVertexInputStageInfo;
-    graphicsPipelineInfo.pInputAssemblyState = &pipelineInputAssemblyStateInfo;
-    graphicsPipelineInfo.pViewportState = &pipelineViewportStateInfo;
-    graphicsPipelineInfo.pRasterizationState = &pipelineRasterizationStateInfo;
-    graphicsPipelineInfo.pMultisampleState = &pipelineMultisampleStateInfo;
-    graphicsPipelineInfo.pColorBlendState = &pipelineColorBlendStateInfo;
-    graphicsPipelineInfo.pDynamicState = &pipelineDynamicStateInfo;
-    graphicsPipelineInfo.layout = pipelineLayout;
-
-    // pipeline
-    VkPipeline graphicsPipeline;
-    success = vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &graphicsPipelineInfo, nullptr, &graphicsPipeline);
-    if(success != VK_SUCCESS){
-        throw std::runtime_error("Failed to create pipeline");
-    }
-
-    // framebuffer
-    std::vector<VkFramebuffer> framebuffers(swapchainImageViews.size());
-    for(auto i = 0; i < framebuffers.size(); ++i){
-        VkFramebufferCreateInfo framebufferInfo = {};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = renderPass;
-        framebufferInfo.attachmentCount = 1;
-        framebufferInfo.pAttachments = &swapchainImageViews[i];
-        framebufferInfo.width = swapchainInfo.imageExtent.width;
-        framebufferInfo.height = swapchainInfo.imageExtent.height;
-        framebufferInfo.layers = 1;
-
-        success = vkCreateFramebuffer(logicalDevice, &framebufferInfo, nullptr, &framebuffers[i]);
-        if(success != VK_SUCCESS){
-            throw std::runtime_error("Failed to create framebuffer");
-        }
-    }
-
     // drawcall
     while(!glfwWindowShouldClose(window)){
         glfwPollEvents();
@@ -466,9 +416,6 @@ int main(){
     // clear
     vkDestroyShaderModule(logicalDevice, vsShaderModule, nullptr);
     vkDestroyShaderModule(logicalDevice, fsShaderModule, nullptr);
-    for(auto &framebuffer : framebuffers)
-        vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
-    vkDestroyPipeline(logicalDevice, graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
     vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
     for(auto &imageview : swapchainImageViews)

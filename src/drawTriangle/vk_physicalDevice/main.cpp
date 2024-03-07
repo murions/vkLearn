@@ -58,7 +58,7 @@ private:
         appInfo.apiVersion = VK_API_VERSION_1_0;
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "No Engine";
-        appInfo.pApplicationName = "Triangle";
+        appInfo.pApplicationName = "VKPhysicalDevice";
         // create instance info
         unsigned int glfwExtensionCnt = 0;
         const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCnt);

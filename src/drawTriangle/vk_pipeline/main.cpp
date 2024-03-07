@@ -51,7 +51,7 @@ int main(){
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pNext = nullptr;
     appInfo.pEngineName = "No Engine";
-    appInfo.pApplicationName = "VKCommand";
+    appInfo.pApplicationName = "VKPipeline";
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_0;
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -440,93 +440,6 @@ int main(){
         throw std::runtime_error("Failed to create pipeline");
     }
 
-    // framebuffer
-    std::vector<VkFramebuffer> framebuffers(swapchainImageViews.size());
-    for(auto i = 0; i < framebuffers.size(); ++i){
-        VkFramebufferCreateInfo framebufferInfo = {};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = renderPass;
-        framebufferInfo.attachmentCount = 1;
-        framebufferInfo.pAttachments = &swapchainImageViews[i];
-        framebufferInfo.width = swapchainInfo.imageExtent.width;
-        framebufferInfo.height = swapchainInfo.imageExtent.height;
-        framebufferInfo.layers = 1;
-
-        success = vkCreateFramebuffer(logicalDevice, &framebufferInfo, nullptr, &framebuffers[i]);
-        if(success != VK_SUCCESS){
-            throw std::runtime_error("Failed to create framebuffer");
-        }
-    }
-
-    // command pool info
-    VkCommandPoolCreateInfo commandPoolInfo = {};
-    commandPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    commandPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    commandPoolInfo.queueFamilyIndex = queueFamilyGraphicsIndex;
-
-    // command pool
-    VkCommandPool commandPool;
-    success = vkCreateCommandPool(logicalDevice, &commandPoolInfo, nullptr, &commandPool);
-    if(success != VK_SUCCESS){
-        throw std::runtime_error("Failed to create command pool");
-    }
-
-    // command buffer
-    VkCommandBuffer commandBuffer;
-
-    // command buffer allocation
-    VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
-    commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    commandBufferAllocateInfo.commandPool = commandPool;
-    commandBufferAllocateInfo.commandBufferCount = 1;
-    commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    success = vkAllocateCommandBuffers(logicalDevice, &commandBufferAllocateInfo, &commandBuffer);
-    if(success != VK_SUCCESS){
-        throw std::runtime_error("Failed to allocate command buffer");
-    }
-
-    // command buffer begin
-    VkCommandBufferBeginInfo commandBufferBeginInfo = {};
-    commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    commandBufferBeginInfo.pInheritanceInfo = nullptr;
-    success = vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
-    if(success != VK_SUCCESS){
-        throw std::runtime_error("Failed to begin recording command buffer");
-    }
-
-    // command: begin render pass
-    VkClearValue clearValue{{{1.0, 0.5, 0.45, 1.0}}};
-    VkRenderPassBeginInfo renderPassBeginInfo = {};
-    renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassBeginInfo.renderPass = renderPass;
-    renderPassBeginInfo.framebuffer = framebuffers[0];
-    renderPassBeginInfo.renderArea.offset = VkOffset2D{0, 0};
-    renderPassBeginInfo.renderArea.extent = swapchainInfo.imageExtent;
-    renderPassBeginInfo.clearValueCount = 1;
-    renderPassBeginInfo.pClearValues = &clearValue;
-    vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-    // command: bind pipeline
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
-    // command: set viewport
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-    // command: set scissor
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-
-    // command: draw
-    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
-
-    // command: end render pass
-    vkCmdEndRenderPass(commandBuffer);
-
-    // command buffer end
-    success = vkEndCommandBuffer(commandBuffer);
-    if(success != VK_SUCCESS){
-        throw std::runtime_error("Failed to record command buffer");
-    }
-
     // drawcall
     while(!glfwWindowShouldClose(window)){
         glfwPollEvents();
@@ -535,9 +448,6 @@ int main(){
     // clear
     vkDestroyShaderModule(logicalDevice, vsShaderModule, nullptr);
     vkDestroyShaderModule(logicalDevice, fsShaderModule, nullptr);
-    vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
-    for(auto &framebuffer : framebuffers)
-        vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
     vkDestroyPipeline(logicalDevice, graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
     vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
