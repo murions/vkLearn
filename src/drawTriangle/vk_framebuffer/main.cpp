@@ -51,7 +51,7 @@ int main(){
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pNext = nullptr;
     appInfo.pEngineName = "No Engine";
-    appInfo.pApplicationName = "VKCommand";
+    appInfo.pApplicationName = "VKFramebuffer";
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_0;
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -440,6 +440,24 @@ int main(){
         throw std::runtime_error("Failed to create pipeline");
     }
 
+    // framebuffer
+    std::vector<VkFramebuffer> framebuffers(swapchainImageViews.size());
+    for(auto i = 0; i < framebuffers.size(); ++i){
+        VkFramebufferCreateInfo framebufferInfo = {};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = renderPass;
+        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.pAttachments = &swapchainImageViews[i];
+        framebufferInfo.width = swapchainInfo.imageExtent.width;
+        framebufferInfo.height = swapchainInfo.imageExtent.height;
+        framebufferInfo.layers = 1;
+
+        success = vkCreateFramebuffer(logicalDevice, &framebufferInfo, nullptr, &framebuffers[i]);
+        if(success != VK_SUCCESS){
+            throw std::runtime_error("Failed to create framebuffer");
+        }
+    }
+
     // drawcall
     while(!glfwWindowShouldClose(window)){
         glfwPollEvents();
@@ -448,6 +466,8 @@ int main(){
     // clear
     vkDestroyShaderModule(logicalDevice, vsShaderModule, nullptr);
     vkDestroyShaderModule(logicalDevice, fsShaderModule, nullptr);
+    for(auto &framebuffer : framebuffers)
+        vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
     vkDestroyPipeline(logicalDevice, graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
     vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
