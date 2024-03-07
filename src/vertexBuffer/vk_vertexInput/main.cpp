@@ -1,5 +1,9 @@
 #include "common/vkShader.h"
 #include "common/util.h"
+#include "glm/fwd.hpp"
+#include "vulkan/vulkan_core.h"
+#include <cstddef>
+#include <glm/glm.hpp>
 #include <exception>
 #include <set>
 #include <iostream>
@@ -22,6 +26,37 @@ private:
     float queuePriorities = 1.0f;
 
     bool framebufferResized = false;
+
+    struct Vertex{
+        glm::vec2 pos;
+        glm::vec3 col;
+
+        static std::vector<VkVertexInputBindingDescription> getVertexInputBindingDesc(){
+            std::vector<VkVertexInputBindingDescription> desc{{}};
+            desc[0].binding = 0;
+            desc[0].stride = sizeof(Vertex);
+            desc[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+            return desc;
+        }
+        static std::vector<VkVertexInputAttributeDescription> getVertexInputAttribDesc(){
+            std::vector<VkVertexInputAttributeDescription> desc = {{}, {}};
+            desc[0].binding = 0;
+            desc[0].format = VK_FORMAT_R32G32_SFLOAT;
+            desc[0].location = 0;
+            desc[0].offset = offsetof(Vertex, pos);
+            desc[1].binding = 0;
+            desc[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+            desc[1].location = 1;
+            desc[1].offset = offsetof(Vertex, col);
+            return  desc;
+        }
+    };
+
+    const std::vector<Vertex> vertexData{
+        {{0, -0.5}, {1, 0, 0}},
+        {{0.5, 0.5}, {0, 1, 0}},
+        {{-0.5, 0.5}, {0, 0, 1}}
+    };
 
 public:
     void run(){
@@ -452,8 +487,12 @@ private:
 
         // pipeline vertex input stage info
         static VkPipelineVertexInputStateCreateInfo pipelineVertexInputStageInfo = {VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
-        pipelineVertexInputStageInfo.vertexBindingDescriptionCount = 0;
-        pipelineVertexInputStageInfo.vertexAttributeDescriptionCount = 0;
+        static auto vertexBindingDesc = Vertex::getVertexInputBindingDesc();
+        static auto vertexAttribDesc = Vertex::getVertexInputAttribDesc();
+        pipelineVertexInputStageInfo.vertexBindingDescriptionCount = vertexBindingDesc.size();
+        pipelineVertexInputStageInfo.vertexAttributeDescriptionCount = vertexAttribDesc.size();
+        pipelineVertexInputStageInfo.pVertexBindingDescriptions = vertexBindingDesc.data();
+        pipelineVertexInputStageInfo.pVertexAttributeDescriptions = vertexAttribDesc.data();
 
         // pipeline input assembly state info
         static VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateInfo = {VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
