@@ -54,7 +54,7 @@ function(buildSubProjects)
 endfunction(buildSubProjects)
 
 set(SUBPROJECTS
-    vk_vertexInput
+    vk_vertexBuffer
 )
 
 buildSubProjects()
