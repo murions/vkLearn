@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(vk_vertexInput)
+project(vk_vertexBuffer)
 
 # add executable
 add_executable(${PROJECT_NAME})

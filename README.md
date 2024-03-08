@@ -21,5 +21,5 @@ You can build the project both on Windows and Linux.
 - [vk_draw](src/drawTriangle/vk_draw)
 - [vk_inflight](src/drawTriangle/vk_inflight)
 - [vk_recreation](src/drawTriangle/vk_recreation)
-- [vk_vertexInput](src/vertexBuffer/vk_vertexInput)
+- [vk_vertexBuffer](src/vertexBuffer/vk_vertexBuffer)
 

@@ -1,14 +1,8 @@
 #include "common/vkShader.h"
 #include "common/util.h"
-#include "glm/fwd.hpp"
-#include "vulkan/vulkan_core.h"
-#include <cstddef>
 #include <glm/glm.hpp>
-#include <exception>
 #include <set>
 #include <iostream>
-#include <stdexcept>
-#include <vector>
 
 #ifndef FRAMES_IN_FLIGHT
     #define FRAMES_IN_FLIGHT 2
@@ -26,6 +20,8 @@ private:
     float queuePriorities = 1.0f;
 
     bool framebufferResized = false;
+
+    VkDeviceSize offsets = {0};
 
     struct Vertex{
         glm::vec2 pos;
@@ -106,6 +102,7 @@ public:
             vkCmdBindPipeline(commandBuffers[currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
             vkCmdSetViewport(commandBuffers[currentFrame], 0, 1, &viewport);
             vkCmdSetScissor(commandBuffers[currentFrame], 0, 1, &scissor);
+            vkCmdBindVertexBuffers(commandBuffers[currentFrame], 0, 1, &vertexBuffer, &offsets);
             vkCmdDraw(commandBuffers[currentFrame], 3, 1, 0, 0);
             vkCmdEndRenderPass(commandBuffers[currentFrame]);
 
@@ -202,6 +199,9 @@ public:
         // command pool
         createCommandPool();
 
+        // vertex buffer
+        allocateVertexBuffer();
+
         // command buffer
         allocateCommandBuffer();
 
@@ -265,6 +265,12 @@ private:
     std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
     std::vector<VkFence> inFlightFences;
+
+    VkBufferCreateInfo vertexBufferInfo = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+    VkBuffer vertexBuffer;
+
+    VkMemoryAllocateInfo vertexMemeryAllocateInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+    VkDeviceMemory vertexMemory;
 
 private:
     void createInstance(){
@@ -583,6 +589,49 @@ private:
         VK_CHECK(vkCreateCommandPool(logicalDevice, &commandPoolInfo, nullptr, &commandPool));
     }
 
+    void allocateVertexBuffer(){
+        vertexBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        vertexBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        vertexBufferInfo.size = sizeof(vertexData[0]) * vertexData.size();
+        // create vertex buffer
+        VK_CHECK(vkCreateBuffer(logicalDevice, &vertexBufferInfo, nullptr, &vertexBuffer));
+
+        // get memory properties
+        VkPhysicalDeviceMemoryProperties memoryProps;
+        vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProps);
+
+        // get memory requirements
+        VkMemoryRequirements memoryRequirements;
+        vkGetBufferMemoryRequirements(logicalDevice, vertexBuffer, &memoryRequirements);
+        
+        // get memory type index
+        uint32_t memoryTypeIndex = 0;
+        for(auto i = 0; i < memoryProps.memoryTypeCount; ++i){
+            if((memoryRequirements.memoryTypeBits & (1 << i)) && (memoryProps.memoryTypes[i].propertyFlags &
+                    (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) ==
+                    (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)){
+                memoryTypeIndex = i;
+                break;
+            }
+        }    
+
+        // fill memory allocate info
+        vertexMemeryAllocateInfo.allocationSize = memoryRequirements.size;
+        vertexMemeryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
+
+        // allocate memory
+        VK_CHECK(vkAllocateMemory(logicalDevice, &vertexMemeryAllocateInfo, nullptr, &vertexMemory));
+
+        // bind vertex buffer
+        VK_CHECK(vkBindBufferMemory(logicalDevice, vertexBuffer, vertexMemory, offsets));
+
+        // map memory
+        void* data;
+        vkMapMemory(logicalDevice, vertexMemory, offsets, vertexBufferInfo.size, 0, &data);
+        memcpy(data, vertexData.data(), vertexBufferInfo.size);
+        vkUnmapMemory(logicalDevice, vertexMemory);
+    }
+
     void allocateCommandBuffer(){
         // fill command buffer allocate info
         commandBuffers.resize(FRAMES_IN_FLIGHT);
@@ -651,6 +700,8 @@ private:
             vkDestroyFence(logicalDevice, inFlightFences[i], nullptr);
         }
         cleanupSwapchain();
+        vkDestroyBuffer(logicalDevice, vertexBuffer, nullptr);
+        vkFreeMemory(logicalDevice, vertexMemory, nullptr);
         vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
         vkDestroyDevice(logicalDevice, nullptr);
         vkDestroySurfaceKHR(instance, surface, nullptr);
