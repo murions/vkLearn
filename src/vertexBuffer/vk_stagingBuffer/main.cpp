@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <set>
 #include <iostream>
+#include <vector>
 
 #ifndef FRAMES_IN_FLIGHT
     #define FRAMES_IN_FLIGHT 2
@@ -120,7 +121,7 @@ public:
                 submitInfo.pWaitDstStageMask = waitDstStageMask;
                 submitInfo.signalSemaphoreCount = 1;
                 submitInfo.pSignalSemaphores = &renderFinishedSemaphores[currentFrame];
-                VK_CHECK(vkQueueSubmit(queue, 1, &submitInfo, inFlightFences[currentFrame]));
+                VK_CHECK(vkQueueSubmit(queues[0], 1, &submitInfo, inFlightFences[currentFrame]));
             }
 
             // present
@@ -131,7 +132,7 @@ public:
                 presentInfo.pImageIndices = &acquireImageIndex;
                 presentInfo.waitSemaphoreCount = 1;
                 presentInfo.pWaitSemaphores = &renderFinishedSemaphores[currentFrame];
-                windowResult = vkQueuePresentKHR(queue, &presentInfo);
+                windowResult = vkQueuePresentKHR(queues[1], &presentInfo);
             }
 
             if(windowResult == VK_ERROR_OUT_OF_DATE_KHR || windowResult == VK_SUBOPTIMAL_KHR || framebufferResized){
@@ -172,8 +173,9 @@ public:
         createLogicalDevice();
 
         // queue
-        vkGetDeviceQueue(logicalDevice, queueFamilyIndices[0], 0, &queue);
-        vkGetDeviceQueue(logicalDevice, queueFamilyIndices[1], 0, &queue);
+        vkGetDeviceQueue(logicalDevice, queueFamilyIndices[0], 0, &queues[0]);
+        vkGetDeviceQueue(logicalDevice, queueFamilyIndices[1], 0, &queues[1]);
+        vkGetDeviceQueue(logicalDevice, queueFamilyIndices[2], 0, &queues[2]);
 
         // swapchain
         createSwapchain();
@@ -224,13 +226,13 @@ private:
     VkSurfaceKHR surface;
 
     VkPhysicalDevice physicalDevice;
-    std::vector<uint32_t> queueFamilyIndices = {UINT32_MAX, UINT32_MAX}; // [0] is graphics index, [1] is present index
+    std::vector<uint32_t> queueFamilyIndices = {UINT32_MAX, UINT32_MAX, UINT32_MAX}; // [0]: graphics, [1]: present, [2]: transfer
     
     std::vector<VkDeviceQueueCreateInfo> queueInfo;
     std::set<uint32_t> queueFamilies;
     VkDeviceCreateInfo logicalDeviceInfo = {VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
     VkDevice logicalDevice;
-    VkQueue queue;
+    std::vector<VkQueue> queues = {{}, {}, {}}; // [0]: graphics, [1]: present, [2]: transfer 
     
     VkSwapchainCreateInfoKHR swapchainInfo = {VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
     VkSwapchainKHR swapchain;
@@ -254,11 +256,11 @@ private:
 
     std::vector<VkFramebuffer> framebuffers;
     
-    VkCommandPoolCreateInfo commandPoolInfo = {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-    VkCommandPool commandPool;
+    std::vector<VkCommandPoolCreateInfo> commandPoolInfos = {2, {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO}};
+    std::vector<VkCommandPool> commandPools{2};
     
     VkCommandBufferAllocateInfo commandBufferAllocateInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-    std::vector<VkCommandBuffer> commandBuffers;
+    std::vector<VkCommandBuffer> commandBuffers{FRAMES_IN_FLIGHT};
     
     VkSemaphoreCreateInfo semaphoreInfo = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
     VkFenceCreateInfo fenceInfo = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, VK_FENCE_CREATE_SIGNALED_BIT};
@@ -266,7 +268,6 @@ private:
     std::vector<VkSemaphore> renderFinishedSemaphores;
     std::vector<VkFence> inFlightFences;
 
-    VkBufferCreateInfo vertexBufferInfo = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
     VkBuffer vertexBuffer;
 
     VkMemoryAllocateInfo vertexMemeryAllocateInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
@@ -276,7 +277,7 @@ private:
     void createInstance(){
         // fill app info
         appInfo.pEngineName = "No Engine";
-        appInfo.pApplicationName = "VKVertexBuffer";
+        appInfo.pApplicationName = "VKStagingBuffer";
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.apiVersion = VK_API_VERSION_1_0;
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -331,13 +332,17 @@ private:
             VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &presentSupport));
             if(presentSupport && queueFamilyIndices[1] == UINT32_MAX)
                 queueFamilyIndices[1] = i;
+            
+            if(((queueFamilyProps[i].queueFlags & VK_QUEUE_TRANSFER_BIT) && !(queueFamilyProps[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) && queueFamilyIndices[2] == UINT32_MAX)
+                queueFamilyIndices[2] = i;
         }
     }
 
     void createLogicalDevice(){
         // fill queue info
         queueFamilies.insert(queueFamilyIndices[0]);
-        queueFamilies.insert(queueFamilyIndices[1]); // remove the same
+        queueFamilies.insert(queueFamilyIndices[1]);
+        queueFamilies.insert(queueFamilyIndices[2]); // remove the same
         for(auto queueFamily : queueFamilies){
             VkDeviceQueueCreateInfo queueCreateInfo = {VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
             queueCreateInfo.queueCount = 1;
@@ -345,7 +350,7 @@ private:
             queueCreateInfo.queueFamilyIndex = queueFamily;
             queueInfo.push_back(queueCreateInfo);
         }
-            
+        
         // fill logical device info
         static VkPhysicalDeviceFeatures deviceFeatures = {};
         static const std::vector<const char *> deviceExtensions = {
@@ -583,18 +588,50 @@ private:
     }
 
     void createCommandPool(){
-        // fill command pool info
-        commandPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        commandPoolInfo.queueFamilyIndex = queueFamilyIndices[0];
-        VK_CHECK(vkCreateCommandPool(logicalDevice, &commandPoolInfo, nullptr, &commandPool));
+        // graphics command pool
+        commandPoolInfos[0].flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        commandPoolInfos[0].queueFamilyIndex = queueFamilyIndices[0];
+        VK_CHECK(vkCreateCommandPool(logicalDevice, &commandPoolInfos[0], nullptr, &commandPools[0]));
+
+        // transfer command pool
+        commandPoolInfos[1].flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        commandPoolInfos[1].queueFamilyIndex = queueFamilyIndices[2];
+        VK_CHECK(vkCreateCommandPool(logicalDevice, &commandPoolInfos[1], nullptr, &commandPools[1]));
     }
 
     void allocateVertexBuffer(){
-        vertexBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-        vertexBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        vertexBufferInfo.size = sizeof(vertexData[0]) * vertexData.size();
+        VkDeviceSize size = sizeof(vertexData[0]) * vertexData.size();
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingMemory;
+        createBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VkMemoryPropertyFlagBits(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT), stagingBuffer, stagingMemory);
+        
+        // map memory
+        void* data;
+        vkMapMemory(logicalDevice, stagingMemory, offsets, size, 0, &data);
+        memcpy(data, vertexData.data(), size);
+        vkUnmapMemory(logicalDevice, stagingMemory);
+        
+        createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+            VkMemoryPropertyFlagBits(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT), vertexBuffer, vertexMemory);
+        
+        copyBuffer(stagingBuffer, vertexBuffer, size);
+
+        vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
+        vkFreeMemory(logicalDevice, stagingMemory, nullptr);
+    }
+
+    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlagBits props, VkBuffer& buffer, VkDeviceMemory& memory){
+        VkBufferCreateInfo bufferInfo = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+        bufferInfo.usage = usage;
+        bufferInfo.size = size;
+        bufferInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        std::vector<uint32_t> indices = {queueFamilyIndices[0], queueFamilyIndices[2]};
+        bufferInfo.queueFamilyIndexCount = 2;
+        bufferInfo.pQueueFamilyIndices = indices.data();
+        
         // create vertex buffer
-        VK_CHECK(vkCreateBuffer(logicalDevice, &vertexBufferInfo, nullptr, &vertexBuffer));
+        VK_CHECK(vkCreateBuffer(logicalDevice, &bufferInfo, nullptr, &buffer));
 
         // get memory properties
         VkPhysicalDeviceMemoryProperties memoryProps;
@@ -602,40 +639,63 @@ private:
 
         // get memory requirements
         VkMemoryRequirements memoryRequirements;
-        vkGetBufferMemoryRequirements(logicalDevice, vertexBuffer, &memoryRequirements);
+        vkGetBufferMemoryRequirements(logicalDevice, buffer, &memoryRequirements);
         
         // get memory type index
         uint32_t memoryTypeIndex = 0;
         for(auto i = 0; i < memoryProps.memoryTypeCount; ++i){
-            if((memoryRequirements.memoryTypeBits & (1 << i)) && (memoryProps.memoryTypes[i].propertyFlags &
-                    (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) ==
-                    (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)){
+            if((memoryRequirements.memoryTypeBits & (1 << i)) && (memoryProps.memoryTypes[i].propertyFlags & props) == props){
                 memoryTypeIndex = i;
                 break;
             }
         }    
 
         // fill memory allocate info
-        vertexMemeryAllocateInfo.allocationSize = memoryRequirements.size;
-        vertexMemeryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
+        VkMemoryAllocateInfo memoryAllocateInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+        memoryAllocateInfo.allocationSize = memoryRequirements.size;
+        memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
 
         // allocate memory
-        VK_CHECK(vkAllocateMemory(logicalDevice, &vertexMemeryAllocateInfo, nullptr, &vertexMemory));
+        VK_CHECK(vkAllocateMemory(logicalDevice, &memoryAllocateInfo, nullptr, &memory));
 
         // bind vertex buffer
-        VK_CHECK(vkBindBufferMemory(logicalDevice, vertexBuffer, vertexMemory, offsets));
+        VK_CHECK(vkBindBufferMemory(logicalDevice, buffer, memory, offsets));
+    }
 
-        // map memory
-        void* data;
-        vkMapMemory(logicalDevice, vertexMemory, offsets, vertexBufferInfo.size, 0, &data);
-        memcpy(data, vertexData.data(), vertexBufferInfo.size);
-        vkUnmapMemory(logicalDevice, vertexMemory);
+    void copyBuffer(VkBuffer src, VkBuffer dst, VkDeviceSize size){
+        VkCommandBufferAllocateInfo copyBufferAllocateInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+        copyBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        copyBufferAllocateInfo.commandPool = commandPools[1];
+        copyBufferAllocateInfo.commandBufferCount = 1;
+
+        VkCommandBuffer copyCommandBuffer;
+        VK_CHECK(vkAllocateCommandBuffers(logicalDevice, &copyBufferAllocateInfo, &copyCommandBuffer));
+
+        VkCommandBufferBeginInfo copyCommandBufferBeginInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+        copyCommandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        VK_CHECK(vkBeginCommandBuffer(copyCommandBuffer, &copyCommandBufferBeginInfo));
+
+        VkBufferCopy bufferCopy;
+        bufferCopy.srcOffset = 0;
+        bufferCopy.dstOffset = 0;
+        bufferCopy.size = size;
+        vkCmdCopyBuffer(copyCommandBuffer, src, dst, 1, &bufferCopy);
+
+        VK_CHECK(vkEndCommandBuffer(copyCommandBuffer));
+
+        VkSubmitInfo copySubmitInfo = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+        copySubmitInfo.commandBufferCount = 1;
+        copySubmitInfo.pCommandBuffers = &copyCommandBuffer;
+
+        VK_CHECK(vkQueueSubmit(queues[2], 1, &copySubmitInfo, VK_NULL_HANDLE));
+        vkQueueWaitIdle(queues[2]);
+
+        vkFreeCommandBuffers(logicalDevice, commandPools[1], 1, &copyCommandBuffer);
     }
 
     void allocateCommandBuffer(){
         // fill command buffer allocate info
-        commandBuffers.resize(FRAMES_IN_FLIGHT);
-        commandBufferAllocateInfo.commandPool = commandPool;
+        commandBufferAllocateInfo.commandPool = commandPools[0];
         commandBufferAllocateInfo.commandBufferCount = FRAMES_IN_FLIGHT;
         commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         VK_CHECK(vkAllocateCommandBuffers(logicalDevice, &commandBufferAllocateInfo, commandBuffers.data()));
@@ -679,7 +739,7 @@ private:
         // cleanup swapchain
         for(auto i = 0; i < framebuffers.size(); ++i)
             vkDestroyFramebuffer(logicalDevice, framebuffers[i], nullptr);
-        vkFreeCommandBuffers(logicalDevice, commandPool, commandBuffers.size(), commandBuffers.data());
+        vkFreeCommandBuffers(logicalDevice, commandPools[0], commandBuffers.size(), commandBuffers.data());
         vkDestroyPipeline(logicalDevice, graphicsPipeline, nullptr);
         vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
         vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
@@ -702,7 +762,8 @@ private:
         cleanupSwapchain();
         vkDestroyBuffer(logicalDevice, vertexBuffer, nullptr);
         vkFreeMemory(logicalDevice, vertexMemory, nullptr);
-        vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
+        vkDestroyCommandPool(logicalDevice, commandPools[0], nullptr);
+        vkDestroyCommandPool(logicalDevice, commandPools[1], nullptr);
         vkDestroyDevice(logicalDevice, nullptr);
         vkDestroySurfaceKHR(instance, surface, nullptr);
         vkDestroyInstance(instance, nullptr);

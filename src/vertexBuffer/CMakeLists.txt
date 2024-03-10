@@ -55,6 +55,7 @@ endfunction(buildSubProjects)
 
 set(SUBPROJECTS
     vk_vertexBuffer
+    vk_stagingBuffer
 )
 
 buildSubProjects()
