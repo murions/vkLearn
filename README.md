@@ -22,4 +22,5 @@ You can build the project both on Windows and Linux.
 - [vk_inflight](src/drawTriangle/vk_inflight)
 - [vk_recreation](src/drawTriangle/vk_recreation)
 - [vk_vertexBuffer](src/vertexBuffer/vk_vertexBuffer)
-
+- [vk_stagingBuffer](src/vertexBuffer/vk_stagingBuffer)
+- [vk_indexBuffer](src/vertexBuffer/vk_indexBuffer)
