@@ -26,11 +26,11 @@ jobs:
       uses: humbletim/install-vulkan-sdk@v1.1.1
 
     - name: Install Dependencies
-      run: sudo apt install libxrandr-dev -y
-           sudo apt install libxinerama-dev -y
-           sudo apt install libx11-dev -y
-           sudo apt install libxcursor-dev -y
-           sudo apt install libxi-dev -y
+      run: sudo apt-get install libxrandr-dev -y
+           sudo apt-get install libxinerama-dev -y
+           sudo apt-get install libx11-dev -y
+           sudo apt-get install libxcursor-dev -y
+           sudo apt-get install libxi-dev -y
       
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
