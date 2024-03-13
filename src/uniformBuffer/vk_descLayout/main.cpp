@@ -1,9 +1,18 @@
 #include "common/vkShader.h"
 #include "common/util.h"
+#include "glm/ext/matrix_clip_space.hpp"
+#include "glm/ext/matrix_float4x4.hpp"
+#include "glm/ext/matrix_transform.hpp"
+#include "glm/ext/vector_float3.hpp"
+#include "glm/trigonometric.hpp"
+#include <cstring>
+#define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <set>
 #include <iostream>
 #include <vector>
+#include <chrono>
 
 #ifndef FRAMES_IN_FLIGHT
     #define FRAMES_IN_FLIGHT 2
@@ -58,6 +67,12 @@ private:
     const std::vector<uint16_t> vertexIndices{
         0, 1, 2,
         2, 3, 0
+    };
+
+    struct Uniform{
+        glm::mat4 model;
+        glm::mat4 view;
+        glm::mat4 proj;
     };
 
 public:
@@ -256,6 +271,9 @@ private:
     VkShaderModuleCreateInfo fsShaderModuleInfo = {VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     VkShaderModule vsShaderModule;
     VkShaderModule fsShaderModule;
+
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    VkDescriptorSetLayout descriptorSetLayout;
     
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
     VkPipelineLayout pipelineLayout;
@@ -282,11 +300,15 @@ private:
     VkDeviceMemory vertexMemory;
     VkDeviceMemory indexMemory;
 
+    std::vector<VkBuffer> uniformBuffer{FRAMES_IN_FLIGHT};
+    std::vector<VkDeviceMemory> uniformMemory{FRAMES_IN_FLIGHT};
+    std::vector<void*> uniformData{FRAMES_IN_FLIGHT};
+
 private:
     void createInstance(){
         // fill app info
         appInfo.pEngineName = "No Engine";
-        appInfo.pApplicationName = "VKIndexBuffer";
+        appInfo.pApplicationName = "VKDescLayout";
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.apiVersion = VK_API_VERSION_1_0;
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -485,10 +507,24 @@ private:
         VK_CHECK(vkCreateShaderModule(logicalDevice, &fsShaderModuleInfo, nullptr, &fsShaderModule));
     }
 
+    void createDescriptorSetLayout(){
+        // fill descriptor set layout info
+        VkDescriptorSetLayoutBinding descriptorSetLayoutBinding;
+        descriptorSetLayoutBinding.binding = 0;
+        descriptorSetLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorSetLayoutBinding.descriptorCount = 1;
+        descriptorSetLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        // create descriptor set layout
+        descriptorSetLayoutInfo.bindingCount = 1;
+        descriptorSetLayoutInfo.pBindings = &descriptorSetLayoutBinding;
+        VK_CHECK(vkCreateDescriptorSetLayout(logicalDevice, &descriptorSetLayoutInfo, nullptr, &descriptorSetLayout));
+    }
+
     void createPipelineLayout(){
         // fill pipeline layout info
-        pipelineLayoutInfo.setLayoutCount = 0;
-        pipelineLayoutInfo.pushConstantRangeCount = 0;
+        pipelineLayoutInfo.setLayoutCount = 1;
+        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
         VK_CHECK(vkCreatePipelineLayout(logicalDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout));
     }
 
@@ -652,6 +688,18 @@ private:
         vkFreeMemory(logicalDevice, stagingMemory, nullptr);
     }
 
+    void allocateUniformBuffer(){
+        VkDeviceSize size = sizeof(Uniform);
+
+        for(auto i = 0; i < FRAMES_IN_FLIGHT; ++i){
+            createBuffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VkMemoryPropertyFlagBits(
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
+                uniformBuffer[i], uniformMemory[i]);
+
+            vkMapMemory(logicalDevice, uniformMemory[i], offsets, size, 0, &uniformData[i]);
+        }
+    }
+
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlagBits props, VkBuffer& buffer, VkDeviceMemory& memory){
         VkBufferCreateInfo bufferInfo = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
         bufferInfo.usage = usage;
@@ -741,6 +789,21 @@ private:
         }
     }
 
+    void updateUniformData(uint32_t currentFrame){
+        static auto start = std::chrono::high_resolution_clock::now();
+
+        auto end = std::chrono::high_resolution_clock::now();
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(end - start).count();
+
+        // set uniform data
+        Uniform uniform;
+        uniform.model = glm::rotate(glm::identity<glm::mat4>(), time * glm::radians(90.0f), glm::vec3(0, 0, 1));
+        uniform.view = glm::lookAt(glm::vec3(2, 2, 2), glm::vec3(0, 0, 0), glm::vec3(0, 0, 1));
+        uniform.proj = glm::perspective(glm::radians(45.0f), windowSize.width / (float)windowSize.height, 0.1f, 10.0f);
+        uniform.proj[1][1] *= -1;
+        memcpy(uniformData[currentFrame], &uniform, sizeof(uniform));
+    }
+
     void recreateSwapchain(){
         // get current window size
         int windowCurrentWidth = 0, windowCurrentHeight = 0;
@@ -789,10 +852,15 @@ private:
             vkDestroyFence(logicalDevice, inFlightFences[i], nullptr);
         }
         cleanupSwapchain();
+        for(auto i = 0; i < FRAMES_IN_FLIGHT; ++i){
+            vkDestroyBuffer(logicalDevice, uniformBuffer[i], nullptr);
+            vkFreeMemory(logicalDevice, uniformMemory[i], nullptr);
+        }
         vkDestroyBuffer(logicalDevice, vertexBuffer, nullptr);
         vkFreeMemory(logicalDevice, vertexMemory, nullptr);
         vkDestroyBuffer(logicalDevice, indexBuffer, nullptr);
         vkFreeMemory(logicalDevice, indexMemory, nullptr);
+        vkDestroyDescriptorSetLayout(logicalDevice, descriptorSetLayout, nullptr);
         vkDestroyCommandPool(logicalDevice, commandPools[0], nullptr);
         vkDestroyCommandPool(logicalDevice, commandPools[1], nullptr);
         vkDestroyDevice(logicalDevice, nullptr);
