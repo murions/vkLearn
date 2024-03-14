@@ -54,7 +54,7 @@ function(buildSubProjects)
 endfunction(buildSubProjects)
 
 set(SUBPROJECTS
-    vk_descLayout
+    vk_descriptorSet
 )
 
 buildSubProjects()
