@@ -98,6 +98,9 @@ public:
             
             // reset fence to signal
             VK_CHECK(vkResetFences(logicalDevice, 1, &inFlightFences[currentFrame]));
+
+            // update uniform buffer
+            updateUniformData(currentFrame);
             
             // record command buffer
             VK_CHECK(vkResetCommandBuffer(commandBuffers[currentFrame], 0));
@@ -210,6 +213,9 @@ public:
         // shader module
         createShaderModule();
 
+        // descriptor set layout
+        createDescriptorSetLayout();
+
         // pipeline layout
         createPipelineLayout();
 
@@ -227,6 +233,9 @@ public:
 
         // vertex index
         allocateVertexIndex();
+
+        // uniform buffer
+        allocateUniformBuffer();
 
         // command buffer
         allocateCommandBuffer();
@@ -272,6 +281,7 @@ private:
     VkShaderModule vsShaderModule;
     VkShaderModule fsShaderModule;
 
+    VkDescriptorSetLayoutBinding descriptorSetLayoutBinding;
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
     VkDescriptorSetLayout descriptorSetLayout;
     
@@ -509,7 +519,6 @@ private:
 
     void createDescriptorSetLayout(){
         // fill descriptor set layout info
-        VkDescriptorSetLayoutBinding descriptorSetLayoutBinding;
         descriptorSetLayoutBinding.binding = 0;
         descriptorSetLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorSetLayoutBinding.descriptorCount = 1;
