@@ -1,11 +1,5 @@
 #include "common/vkShader.h"
 #include "common/util.h"
-#include "glm/ext/matrix_clip_space.hpp"
-#include "glm/ext/matrix_float4x4.hpp"
-#include "glm/ext/matrix_transform.hpp"
-#include "glm/ext/vector_float3.hpp"
-#include "glm/trigonometric.hpp"
-#include <cstring>
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -70,9 +64,10 @@ private:
     };
 
     struct Uniform{
-        glm::mat4 model;
-        glm::mat4 view;
-        glm::mat4 proj;
+        alignas(4) float padding;
+        alignas(16) glm::mat4 model;
+        alignas(16) glm::mat4 view;
+        alignas(16) glm::mat4 proj;
     };
 
 public:
@@ -128,6 +123,7 @@ public:
             vkCmdSetScissor(commandBuffers[currentFrame], 0, 1, &scissor);
             vkCmdBindVertexBuffers(commandBuffers[currentFrame], 0, 1, &vertexBuffer, &offsets);
             vkCmdBindIndexBuffer(commandBuffers[currentFrame], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+            vkCmdBindDescriptorSets(commandBuffers[currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
             vkCmdDrawIndexed(commandBuffers[currentFrame], vertexIndices.size(), 1, 0, 0, 0);
             vkCmdEndRenderPass(commandBuffers[currentFrame]);
 
@@ -237,6 +233,12 @@ public:
         // uniform buffer
         allocateUniformBuffer();
 
+        // descriptor pool
+        createDescriptorPool();
+
+        // descriptor set
+        createDescriptorSet();
+
         // command buffer
         allocateCommandBuffer();
 
@@ -284,7 +286,14 @@ private:
     VkDescriptorSetLayoutBinding descriptorSetLayoutBinding;
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
     VkDescriptorSetLayout descriptorSetLayout;
-    
+
+    VkDescriptorPoolCreateInfo descriptorPoolInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    VkDescriptorPool descriptorPool;
+
+    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+    std::vector<VkDescriptorSet> descriptorSets{FRAMES_IN_FLIGHT};
+
+    VkDescriptorPoolSize descriptorPoolSize = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER};
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
     VkPipelineLayout pipelineLayout;
     
@@ -318,7 +327,7 @@ private:
     void createInstance(){
         // fill app info
         appInfo.pEngineName = "No Engine";
-        appInfo.pApplicationName = "VKDescLayout";
+        appInfo.pApplicationName = "VKDescriptorSet";
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.apiVersion = VK_API_VERSION_1_0;
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -578,7 +587,7 @@ private:
         pipelineRasterizationStateInfo.polygonMode = VK_POLYGON_MODE_FILL;
         pipelineRasterizationStateInfo.lineWidth = 1.0;
         pipelineRasterizationStateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-        pipelineRasterizationStateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+        pipelineRasterizationStateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         pipelineRasterizationStateInfo.depthBiasEnable = VK_FALSE;
         pipelineRasterizationStateInfo.depthBiasClamp = 0.0;
         pipelineRasterizationStateInfo.depthBiasConstantFactor = 0.0;
@@ -781,6 +790,49 @@ private:
         vkFreeCommandBuffers(logicalDevice, commandPools[1], 1, &copyCommandBuffer);
     }
 
+    void createDescriptorPool(){
+        // fill descriptor pool info
+        descriptorPoolSize.descriptorCount = FRAMES_IN_FLIGHT;
+        descriptorPoolInfo.poolSizeCount = 1;
+        descriptorPoolInfo.pPoolSizes = &descriptorPoolSize;
+        descriptorPoolInfo.maxSets = FRAMES_IN_FLIGHT;
+
+        // create descriptor pool
+        VK_CHECK(vkCreateDescriptorPool(logicalDevice, &descriptorPoolInfo, nullptr, &descriptorPool));
+    }
+
+    void createDescriptorSet(){
+        // fill descriptor set allocate info
+        static std::vector<VkDescriptorSetLayout> descriptorSetLayouts(FRAMES_IN_FLIGHT, descriptorSetLayout);
+        descriptorSetAllocateInfo.descriptorPool = descriptorPool;
+        descriptorSetAllocateInfo.descriptorSetCount = FRAMES_IN_FLIGHT;
+        descriptorSetAllocateInfo.pSetLayouts = descriptorSetLayouts.data();
+
+        // allocate descriptor set
+        VK_CHECK(vkAllocateDescriptorSets(logicalDevice, &descriptorSetAllocateInfo, descriptorSets.data()));
+
+        // populate descriptor set
+        for(auto i = 0; i < FRAMES_IN_FLIGHT; ++i){
+            // fill descriptor buffer info
+            VkDescriptorBufferInfo descriptorBufferInfo;
+            descriptorBufferInfo.buffer = uniformBuffer[i];
+            descriptorBufferInfo.offset = 0;
+            descriptorBufferInfo.range = sizeof(Uniform);
+            
+            // fill write descriptor set
+            VkWriteDescriptorSet writeDescriptorSet = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            writeDescriptorSet.dstSet = descriptorSets[i];
+            writeDescriptorSet.dstBinding = 0;
+            writeDescriptorSet.dstArrayElement = 0;
+            writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            writeDescriptorSet.descriptorCount = 1;
+            writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
+
+            // update descriptor set
+            vkUpdateDescriptorSets(logicalDevice, 1, &writeDescriptorSet, 0, nullptr);
+        }
+    }
+
     void allocateCommandBuffer(){
         // fill command buffer allocate info
         commandBufferAllocateInfo.commandPool = commandPools[0];
@@ -869,6 +921,7 @@ private:
         vkFreeMemory(logicalDevice, vertexMemory, nullptr);
         vkDestroyBuffer(logicalDevice, indexBuffer, nullptr);
         vkFreeMemory(logicalDevice, indexMemory, nullptr);
+        vkDestroyDescriptorPool(logicalDevice, descriptorPool, nullptr);
         vkDestroyDescriptorSetLayout(logicalDevice, descriptorSetLayout, nullptr);
         vkDestroyCommandPool(logicalDevice, commandPools[0], nullptr);
         vkDestroyCommandPool(logicalDevice, commandPools[1], nullptr);
