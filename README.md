@@ -25,3 +25,4 @@ You can build the project both on Windows and Linux.
 - [vk_stagingBuffer](src/vertexBuffer/vk_stagingBuffer)
 - [vk_indexBuffer](src/vertexBuffer/vk_indexBuffer)
 - [vk_descriptorSet](src/uniformBuffer/vk_descriptorSet)
+- [vk_image](src/textureMap/vk_image)
