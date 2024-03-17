@@ -56,6 +56,7 @@ endfunction(buildSubProjects)
 
 set(SUBPROJECTS
     vk_image
+    vk_sampler
 )
 
 buildSubProjects()
