@@ -27,3 +27,4 @@ You can build the project both on Windows and Linux.
 - [vk_descriptorSet](src/uniformBuffer/vk_descriptorSet)
 - [vk_image](src/textureMap/vk_image)
 - [vk_sampler](src/textureMap/vk_sampler)
+- [vk_depth](src/depthBuffer/vk_depth)
