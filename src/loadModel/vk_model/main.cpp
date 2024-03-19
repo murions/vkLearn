@@ -1,19 +1,67 @@
 #include "common/vkShader.h"
 #include "common/util.h"
+#include <cstdint>
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/hash.hpp>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
 #include <set>
 #include <iostream>
 #include <vector>
 #include <chrono>
+#include <unordered_map>
 
 #ifndef FRAMES_IN_FLIGHT
     #define FRAMES_IN_FLIGHT 2
 #endif
+
+struct Vertex{
+    glm::vec3 pos;
+    glm::vec3 col;
+    glm::vec2 texcoord;
+
+    static std::vector<VkVertexInputBindingDescription> getVertexInputBindingDesc(){
+        std::vector<VkVertexInputBindingDescription> desc{{}};
+        desc[0].binding = 0;
+        desc[0].stride = sizeof(Vertex);
+        desc[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        return desc;
+    }
+    static std::vector<VkVertexInputAttributeDescription> getVertexInputAttribDesc(){
+        std::vector<VkVertexInputAttributeDescription> desc{3};
+        desc[0].binding = 0;
+        desc[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+        desc[0].location = 0;
+        desc[0].offset = offsetof(Vertex, pos);
+        desc[1].binding = 0;
+        desc[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        desc[1].location = 1;
+        desc[1].offset = offsetof(Vertex, col);
+        desc[2].binding = 0;
+        desc[2].format = VK_FORMAT_R32G32_SFLOAT;
+        desc[2].location = 2;
+        desc[2].offset = offsetof(Vertex, texcoord);
+        return  desc;
+    }
+
+    bool operator==(const Vertex& other) const{
+        return pos == other.pos && col == other.col && texcoord == other.texcoord;
+    }
+};
+
+namespace std{
+    template<> struct hash<Vertex>{
+        size_t operator()(Vertex const& vertex) const{
+            return ((hash<glm::vec3>()(vertex.pos) ^ (hash<glm::vec3>()(vertex.col) << 1)) >> 1) ^ (hash<glm::vec2>()(vertex.texcoord) << 1);
+        }
+    };
+}
 
 class App{
 private:
@@ -30,54 +78,8 @@ private:
 
     VkDeviceSize offsets = {0};
 
-    struct Vertex{
-        glm::vec3 pos;
-        glm::vec3 col;
-        glm::vec2 texcoord;
-
-        static std::vector<VkVertexInputBindingDescription> getVertexInputBindingDesc(){
-            std::vector<VkVertexInputBindingDescription> desc{{}};
-            desc[0].binding = 0;
-            desc[0].stride = sizeof(Vertex);
-            desc[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-            return desc;
-        }
-        static std::vector<VkVertexInputAttributeDescription> getVertexInputAttribDesc(){
-            std::vector<VkVertexInputAttributeDescription> desc{3};
-            desc[0].binding = 0;
-            desc[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-            desc[0].location = 0;
-            desc[0].offset = offsetof(Vertex, pos);
-            desc[1].binding = 0;
-            desc[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-            desc[1].location = 1;
-            desc[1].offset = offsetof(Vertex, col);
-            desc[2].binding = 0;
-            desc[2].format = VK_FORMAT_R32G32_SFLOAT;
-            desc[2].location = 2;
-            desc[2].offset = offsetof(Vertex, texcoord);
-            return  desc;
-        }
-    };
-
-    const std::vector<Vertex> vertexData{
-        {{0.5, -0.5, 0.25}, {1, 1, 0}, {1, 1}},
-        {{0.5, 0.5, 0.25}, {1, 0, 1}, {1, 0}},
-        {{-0.5, 0.5, 0.25}, {0, 1, 1}, {0, 0}},
-        {{-0.5, -0.5, 0.25}, {0, 1, 0}, {0, 1}},
-
-        {{0.5, -0.5, -0.25}, {1, 1, 0}, {1, 1}},
-        {{0.5, 0.5, -0.25}, {1, 0, 1}, {1, 0}},
-        {{-0.5, 0.5, -0.25}, {0, 1, 1}, {0, 0}},
-        {{-0.5, -0.5, -0.25}, {0, 1, 0}, {0, 1}}
-    };
-    const std::vector<uint16_t> vertexIndices{
-        0, 1, 2,
-        2, 3, 0,
-
-        4, 5, 6,
-        6, 7, 4
-    };
+    std::vector<Vertex> vertexData;
+    std::vector<uint32_t> vertexIndices;
 
     struct Uniform{
         alignas(4) float padding;
@@ -138,7 +140,7 @@ public:
             vkCmdSetViewport(commandBuffers[currentFrame], 0, 1, &viewport);
             vkCmdSetScissor(commandBuffers[currentFrame], 0, 1, &scissor);
             vkCmdBindVertexBuffers(commandBuffers[currentFrame], 0, 1, &vertexBuffer, &offsets);
-            vkCmdBindIndexBuffer(commandBuffers[currentFrame], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+            vkCmdBindIndexBuffer(commandBuffers[currentFrame], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
             vkCmdBindDescriptorSets(commandBuffers[currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
             vkCmdDrawIndexed(commandBuffers[currentFrame], vertexIndices.size(), 1, 0, 0, 0);
             vkCmdEndRenderPass(commandBuffers[currentFrame]);
@@ -242,6 +244,9 @@ public:
 
         // command pool
         createCommandPool();
+
+        // load model
+        loadModel();
 
         // vertex buffer
         allocateVertexBuffer();
@@ -361,7 +366,7 @@ private:
     void createInstance(){
         // fill app info
         appInfo.pEngineName = "No Engine";
-        appInfo.pApplicationName = "VKDepth";
+        appInfo.pApplicationName = "VKModel";
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.apiVersion = VK_API_VERSION_1_0;
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -714,6 +719,41 @@ private:
         commandPoolInfos[1].queueFamilyIndex = queueFamilyIndices[2];
         VK_CHECK(vkCreateCommandPool(logicalDevice, &commandPoolInfos[1], nullptr, &commandPools[1]));
     }
+    
+    void loadModel(){
+        tinyobj::attrib_t attrib;
+        std::vector<tinyobj::shape_t> shapes;
+        std::vector<tinyobj::material_t> materials;
+        std::string warn, err;
+
+        if(!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, ASSET_SOURCE_DIR"/viking/viking_room.obj")){
+            throw std::runtime_error(warn + err);
+        }
+
+        std::unordered_map<Vertex, uint32_t> uniqueVertices;
+        for(const auto &shape : shapes){
+            for(const auto &index : shape.mesh.indices){
+                Vertex vertex = {};
+
+                vertex.pos = {
+                    attrib.vertices[3 * index.vertex_index + 0],
+                    attrib.vertices[3 * index.vertex_index + 1],
+                    attrib.vertices[3 * index.vertex_index + 2]
+                };
+                vertex.texcoord = {
+                    attrib.texcoords[2 * index.texcoord_index + 0],
+                    1.0 - attrib.texcoords[2 * index.texcoord_index + 1]
+                };
+                vertex.col = {1.0f, 1.0f, 1.0f};
+
+                if(uniqueVertices.count(vertex) == 0){
+                    uniqueVertices[vertex] = vertexData.size();
+                    vertexData.push_back(vertex);
+                }
+                vertexIndices.push_back(uniqueVertices[vertex]);
+            }
+        }
+    }
 
     void allocateVertexBuffer(){
         VkDeviceSize size = sizeof(vertexData[0]) * vertexData.size();
@@ -851,7 +891,7 @@ private:
     void createTextureImage(){
         // load image
         int textureWidth, textureHeight, textureChannel;
-        unsigned char* img = stbi_load(HOME_DIR"/img/statue.jpg", &textureWidth, &textureHeight, &textureChannel, STBI_rgb_alpha);
+        unsigned char* img = stbi_load(ASSET_SOURCE_DIR"/viking/viking_room.png", &textureWidth, &textureHeight, &textureChannel, STBI_rgb_alpha);
         
         // staging buffer
         VkDeviceSize size = textureWidth * textureHeight * 4;
@@ -1158,7 +1198,7 @@ private:
 
         // set uniform data
         Uniform uniform;
-        uniform.model = glm::rotate(glm::identity<glm::mat4>(), time * glm::radians(90.0f), glm::vec3(0, 0, 1));
+        uniform.model = glm::rotate(glm::identity<glm::mat4>(), time * glm::radians(30.0f), glm::vec3(0, 0, 1));
         uniform.view = glm::lookAt(glm::vec3(2, 2, 2), glm::vec3(0, 0, 0), glm::vec3(0, 0, 1));
         uniform.proj = glm::perspective(glm::radians(45.0f), windowSize.width / (float)windowSize.height, 0.1f, 10.0f);
         uniform.proj[1][1] *= -1;
