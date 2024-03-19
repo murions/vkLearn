@@ -8,7 +8,7 @@ if(UNIX AND NOT APPLE)
 endif()
 
 # option
-option(ENABLE_VALIDATION_LAYER "Choose to enable VK_VALIDATION_LAYER or not." ON)
+option(ENABLE_VALIDATION_LAYER "Choose to enable VK_VALIDATION_LAYER or not." OFF)
 
 # mkdir
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/ext)
